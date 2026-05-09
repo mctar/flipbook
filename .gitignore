@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual env (uv creates and manages this)
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude Code per-user settings (not the shared CLAUDE.md)
+.claude/settings.local.json
+
+# User data — should never be committed even if it ends up in the tree.
+# The real DB lives in ~/.tools-crm/ outside the repo, but guard against
+# accidental copies into the project directory.
+crm.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+
+# Build / distribution artefacts (none today, future-proofing)
+dist/
+build/

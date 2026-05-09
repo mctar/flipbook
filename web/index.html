@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a1a">
+<title>Flipbook</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon.svg">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Flipbook">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script defer src="/static/alpine.min.js"></script>
+<style>
+  :root {
+    --paper:    #f4f1ea;
+    --paper-2:  #ece8de;
+    --rule:     #c9c1ad;
+    --rule-2:   #ddd6c4;
+    --ink:      #1a1a1a;
+    --muted:    #6b5d4f;
+    --soft:     #8a7d6e;
+    --red:      #8b1a1a;
+    --red-deep: #6e1414;
+    --tag-bg:   #e8e2d1;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); }
+  body {
+    font-family: "IBM Plex Serif", Georgia, serif;
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.5;
+    padding-bottom: env(safe-area-inset-bottom);
+    background-image:
+      radial-gradient(rgba(0,0,0,0.025) 1px, transparent 1px),
+      radial-gradient(rgba(0,0,0,0.018) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 1px;
+  }
+
+  /* MASTHEAD */
+  header {
+    border-bottom: 2px solid var(--ink);
+    padding: 18px 22px 14px;
+    background: var(--paper);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .masthead {
+    display: flex; align-items: baseline; justify-content: space-between;
+    max-width: 920px; margin: 0 auto;
+  }
+  .wordmark {
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .wordmark::before {
+    content: "";
+    display: inline-block;
+    width: 10px; height: 10px;
+    background: var(--red);
+    border-radius: 50%;
+  }
+  .edition {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--soft);
+    text-transform: uppercase;
+  }
+  .edition .status::before { content: "● "; color: var(--soft); }
+  .edition .status.ok::before { color: #2d6a3e; }
+  .edition .status.off::before { color: var(--red); }
+
+  /* TABS */
+  nav {
+    background: var(--paper);
+    border-bottom: 1px solid var(--rule);
+    position: sticky; top: 65px; z-index: 9;
+  }
+  .nav-inner {
+    display: flex;
+    max-width: 920px; margin: 0 auto;
+  }
+  nav button {
+    flex: 1;
+    padding: 14px 8px 12px;
+    border: 0;
+    background: transparent;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  nav button:hover { color: var(--ink); }
+  nav button.active {
+    color: var(--ink);
+    border-bottom-color: var(--red);
+    font-weight: 600;
+  }
+
+  main {
+    padding: 22px 18px 60px;
+    max-width: 920px; margin: 0 auto;
+  }
+
+  .section-rule {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 6px;
+    margin: 26px 0 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .section-rule:first-child { margin-top: 4px; }
+  .section-rule .count { color: var(--soft); font-weight: 400; }
+
+  /* CARD */
+  .card {
+    background: #fbf8f0;
+    border: 1px solid var(--rule);
+    padding: 14px 16px 12px;
+    margin-bottom: 10px;
+    position: relative;
+    transition: border-color 0.15s ease, transform 0.05s ease;
+  }
+  .card.tap { cursor: pointer; }
+  .card.tap:hover { border-color: var(--ink); }
+  .card.tap:active { transform: translateY(1px); }
+  .card.overdue::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 0 22px 22px 0;
+    border-color: transparent var(--red) transparent transparent;
+  }
+  .card-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px;
+    margin-bottom: 2px;
+  }
+  .card-name {
+    font-family: "IBM Plex Serif", serif;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 1.2;
+    margin: 0;
+  }
+  .card-meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: var(--soft);
+    white-space: nowrap;
+  }
+  .card-sub {
+    font-family: "IBM Plex Serif", serif;
+    color: var(--muted);
+    font-size: 14px;
+    font-style: italic;
+  }
+  .card-body { margin-top: 8px; font-size: 14px; }
+  .channel-line {
+    display: flex; gap: 8px; align-items: baseline; margin-top: 6px;
+  }
+
+  /* TAGS */
+  .tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: var(--tag-bg);
+    color: var(--ink);
+    padding: 2px 7px;
+    border: 1px solid var(--rule);
+  }
+  .tag.channel { background: transparent; }
+
+  /* CHIPS */
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; }
+  .chip {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 5px 11px;
+    border: 1px solid var(--rule);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .chip:hover { color: var(--ink); border-color: var(--ink); }
+  .chip.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  /* FORMS */
+  input, select, textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--rule);
+    border-radius: 0;
+    background: var(--paper);
+    font-family: "IBM Plex Serif", serif;
+    font-size: 15px;
+    color: var(--ink);
+    transition: border-color 0.12s ease;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--red);
+  }
+  textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+  label {
+    display: block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 12px 0 4px;
+  }
+  label:first-child { margin-top: 0; }
+
+  /* BUTTONS */
+  .btn {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 10px 16px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .btn:hover { background: var(--red-deep); border-color: var(--red-deep); }
+  .btn.secondary { background: transparent; color: var(--ink); }
+  .btn.secondary:hover { background: var(--ink); color: var(--paper); }
+  .btn.danger { background: transparent; color: var(--red); border-color: var(--red); }
+  .btn.danger:hover { background: var(--red); color: var(--paper); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn:disabled:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
+  .toolbar input { flex: 1; }
+
+  .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 540px) { .grid-form { grid-template-columns: 1fr; } }
+
+  .entries { margin-top: 4px; }
+  .entry { border-top: 1px dashed var(--rule); padding: 10px 0; }
+  .entry:first-child { border-top: 0; padding-top: 4px; }
+  .entry-head {
+    display: flex; gap: 10px; align-items: baseline;
+    margin-bottom: 3px;
+  }
+  .entry-head .date {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: var(--soft);
+  }
+  .entry-summary { font-size: 14px; line-height: 1.5; }
+  .entry-followup {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-top: 4px;
+  }
+
+  .block {
+    background: #fbf8f0;
+    border: 1px solid var(--rule);
+    padding: 18px 18px 16px;
+    margin-bottom: 14px;
+  }
+  .block h3 {
+    font-family: "IBM Plex Serif", serif;
+    font-size: 17px;
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+
+  .detail-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 6px;
+    gap: 10px;
+  }
+  .detail-head h2 {
+    font-family: "IBM Plex Serif", serif;
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.1;
+  }
+  .detail-sub {
+    font-family: "IBM Plex Serif", serif;
+    font-style: italic;
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 14px;
+  }
+
+  .empty {
+    text-align: left;
+    color: var(--soft);
+    padding: 18px 4px;
+    font-style: italic;
+    font-size: 14px;
+  }
+  .help {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0 0 12px;
+  }
+  .help table {
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+  }
+  .help td {
+    border-top: 1px dashed var(--rule);
+    padding: 4px 12px 4px 0;
+    vertical-align: top;
+  }
+
+  /* DROPZONE */
+  .dropzone {
+    border: 2px dashed var(--rule);
+    background: #fbf8f0;
+    padding: 36px 18px;
+    margin: 16px 0 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .dropzone:hover { border-color: var(--ink); }
+  .dropzone.dragging {
+    border-color: var(--red);
+    background: var(--paper-2);
+  }
+  .dropzone-icon {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 30px;
+    line-height: 1;
+    color: var(--soft);
+    margin-bottom: 10px;
+  }
+  .dropzone.dragging .dropzone-icon { color: var(--red); }
+  .dropzone-title {
+    font-family: "IBM Plex Serif", serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .dropzone-hint {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ERROR BANNER */
+  .error-bar {
+    background: var(--red);
+    color: var(--paper);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    padding: 8px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .error-bar button {
+    background: transparent;
+    border: 1px solid var(--paper);
+    color: var(--paper);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    cursor: pointer;
+  }
+
+  /* DONE BUTTON on bench follow-up cards */
+  .card-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .btn-done {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 6px 12px;
+    border: 1px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .btn-done:hover { background: var(--ink); color: var(--paper); }
+  .entry-followup.done {
+    color: var(--soft);
+    text-decoration: line-through;
+  }
+  .entry-completed {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #2d6a3e;
+    margin-top: 4px;
+  }
+
+  details summary {
+    cursor: pointer;
+    color: var(--red);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 0;
+  }
+  details pre {
+    background: var(--paper-2);
+    padding: 10px;
+    border: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    overflow: auto;
+  }
+
+  @media (max-width: 540px) {
+    main { padding: 18px 14px 60px; }
+    .detail-head h2 { font-size: 22px; }
+    .card-name { font-size: 17px; }
+  }
+
+  [x-cloak] { display: none !important; }
+
+  .colophon {
+    max-width: 920px;
+    margin: 40px auto 0;
+    padding: 14px 18px 24px;
+    border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--soft);
+    text-align: center;
+  }
+  .colophon .dot { color: var(--red); }
+</style>
+</head>
+<body x-data="flipbook()" x-init="init()">
+
+<header>
+  <div class="masthead">
+    <div class="wordmark">FLIPBOOK</div>
+    <div class="edition">
+      ED. 1 &nbsp;·&nbsp;
+      <span class="status" :class="{ok: status==='connected', off: status==='offline'}" x-text="status"></span>
+    </div>
+  </div>
+</header>
+
+<div class="error-bar" x-show="error" x-cloak>
+  <span x-text="error"></span>
+  <button @click="error = ''">Dismiss</button>
+</div>
+
+<nav>
+  <div class="nav-inner">
+    <button :class="{active: tab==='bench'}"  @click="tab='bench'; loadBench()">Bench</button>
+    <button :class="{active: tab==='book'}"   @click="tab='book'; loadBook()">Book</button>
+    <button :class="{active: tab==='intake'}" @click="tab='intake'">Intake</button>
+  </div>
+</nav>
+
+<main>
+
+<!-- BENCH -->
+<section x-show="tab==='bench'" x-cloak>
+  <div class="section-rule">
+    <span>On the bench</span>
+    <span class="count" x-text="bench.followups.length + ' due'"></span>
+  </div>
+  <template x-if="bench.followups.length === 0">
+    <div class="empty">Nothing due. Nice and clear.</div>
+  </template>
+  <template x-for="f in bench.followups" :key="f.id">
+    <div class="card overdue">
+      <div class="card-head tap" @click="openContact(f.contact_id)" style="cursor:pointer">
+        <h3 class="card-name" x-text="f.contact_name"></h3>
+        <span class="card-meta" x-text="'DUE ' + f.follow_up_date"></span>
+      </div>
+      <div class="card-sub tap" @click="openContact(f.contact_id)" style="cursor:pointer">
+        <span x-text="f.contact_company || ''"></span>
+        <span x-show="f.contact_phone" x-text="' · ' + f.contact_phone"></span>
+      </div>
+      <div class="card-body tap" @click="openContact(f.contact_id)" style="cursor:pointer" x-text="f.summary"></div>
+      <div class="card-actions">
+        <button class="btn-done" @click.stop="completeFollowup(f.id)">✓ Done</button>
+      </div>
+    </div>
+  </template>
+
+  <div class="section-rule" x-show="bench.upcoming.length">
+    <span>Coming up</span>
+    <span class="count" x-text="bench.upcoming.length + ' next 7 days'"></span>
+  </div>
+  <template x-for="u in bench.upcoming" :key="u.id">
+    <div class="card tap" @click="openContact(u.contact_id)">
+      <div class="card-head">
+        <h3 class="card-name" x-text="u.contact_name"></h3>
+        <span class="card-meta" x-text="u.follow_up_date"></span>
+      </div>
+      <div class="card-sub">
+        <span x-text="u.contact_company || ''"></span>
+        <span x-show="u.contact_phone" x-text="' · ' + u.contact_phone"></span>
+      </div>
+      <div class="card-body" x-text="u.summary"></div>
+    </div>
+  </template>
+
+  <div class="section-rule">
+    <span>Recent entries</span>
+    <span class="count" x-text="bench.recent.length + ' last 7 days'"></span>
+  </div>
+  <template x-if="bench.recent.length === 0">
+    <div class="empty">No entries logged in the last week.</div>
+  </template>
+  <template x-for="r in bench.recent" :key="r.id">
+    <div class="card tap" @click="openContact(r.contact_id)">
+      <div class="card-head">
+        <h3 class="card-name" x-text="r.contact_name"></h3>
+        <span class="card-meta" x-text="r.occurred_at.slice(0,10)"></span>
+      </div>
+      <div class="card-sub" x-text="r.contact_company || ''"></div>
+      <div class="channel-line">
+        <span class="tag channel" x-text="r.channel"></span>
+        <span style="font-size:14px" x-text="r.summary"></span>
+      </div>
+    </div>
+  </template>
+</section>
+
+<!-- BOOK -->
+<section x-show="tab==='book'" x-cloak>
+  <div x-show="!detail">
+    <div class="toolbar">
+      <input type="search" placeholder="Search name, firm, email, notes…" x-model="q" @input.debounce.300ms="loadBook()">
+      <button class="btn" @click="newOpen = true">+ New</button>
+    </div>
+    <div class="chips">
+      <span class="chip" :class="{active: !tagFilter}" @click="tagFilter=''; loadBook()">All</span>
+      <template x-for="t in tags" :key="t">
+        <span class="chip" :class="{active: tagFilter===t}" @click="tagFilter=t; loadBook()" x-text="t"></span>
+      </template>
+    </div>
+    <div class="section-rule">
+      <span>Index</span>
+      <span class="count" x-text="contacts.length + ' cards'"></span>
+    </div>
+    <template x-if="contacts.length === 0">
+      <div class="empty">No cards match. Try clearing the filter, or run an intake.</div>
+    </template>
+    <template x-for="c in contacts" :key="c.id">
+      <div class="card tap" @click="openContact(c.id)">
+        <div class="card-head">
+          <h3 class="card-name" x-text="c.name"></h3>
+          <span class="card-meta" x-text="c.updated_at.slice(0,10)"></span>
+        </div>
+        <div class="card-sub">
+          <span x-text="c.company || '—'"></span>
+          <span x-show="c.role" x-text="' · ' + c.role"></span>
+        </div>
+        <div class="tags" x-show="c.tags">
+          <template x-for="t in (c.tags || '').split(',').filter(Boolean)" :key="t">
+            <span class="tag" x-text="t"></span>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <div x-show="newOpen" x-cloak class="block" style="margin-top:18px">
+      <h3>New card</h3>
+      <div class="grid-form">
+        <div><label>Name</label><input x-model="newContact.name" placeholder="Required"></div>
+        <div><label>Firm</label><input x-model="newContact.company"></div>
+        <div><label>Role</label><input x-model="newContact.role"></div>
+        <div><label>Phone</label><input x-model="newContact.phone"></div>
+        <div><label>Email</label><input x-model="newContact.email"></div>
+        <div><label>Tags</label><input x-model="newContact.tags" placeholder="oslo, makita"></div>
+      </div>
+      <label>Notes</label>
+      <textarea x-model="newContact.notes"></textarea>
+      <div style="margin-top: 14px; display: flex; gap: 8px;">
+        <button class="btn" @click="createContact()" :disabled="!newContact.name">Save card</button>
+        <button class="btn secondary" @click="newOpen = false">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="detail" x-cloak>
+    <button class="btn secondary" @click="detail = null; loadBook()" style="margin-bottom: 14px">← Back to index</button>
+
+    <div class="block" x-show="detail">
+      <div class="detail-head">
+        <h2 x-text="detail?.name"></h2>
+        <span class="card-meta" x-text="'CARD ' + String(detail?.id || '').padStart(4, '0')"></span>
+      </div>
+      <div class="detail-sub">
+        <span x-text="detail?.company || '—'"></span>
+        <span x-show="detail?.role" x-text="' · ' + detail.role"></span>
+      </div>
+      <div class="grid-form">
+        <div><label>Name</label><input x-model="detail.name"></div>
+        <div><label>Firm</label><input x-model="detail.company"></div>
+        <div><label>Role</label><input x-model="detail.role"></div>
+        <div><label>Phone</label><input x-model="detail.phone"></div>
+        <div><label>Email</label><input x-model="detail.email"></div>
+      </div>
+      <label>Tags</label>
+      <input x-model="detail.tags" placeholder="oslo, makita, hot">
+      <label>Notes</label>
+      <textarea x-model="detail.notes"></textarea>
+      <div style="margin-top: 14px; display: flex; gap: 8px; justify-content: space-between;">
+        <button class="btn" @click="saveContact()">Save changes</button>
+        <button class="btn danger" @click="deleteContact()">Delete card</button>
+      </div>
+    </div>
+
+    <div class="block" x-show="detail">
+      <h3>New entry</h3>
+      <div class="grid-form">
+        <div>
+          <label>Channel</label>
+          <select x-model="newEntry.channel">
+            <option>call</option><option>email</option><option>visit</option>
+            <option>meeting</option><option>other</option>
+          </select>
+        </div>
+        <div>
+          <label>Next contact</label>
+          <input type="date" x-model="newEntry.follow_up_date">
+        </div>
+      </div>
+      <label>Summary</label>
+      <textarea x-model="newEntry.summary" placeholder="What happened? What did they ask for?"></textarea>
+      <div style="margin-top: 14px">
+        <button class="btn" @click="logEntry()" :disabled="!newEntry.summary">Log entry</button>
+      </div>
+    </div>
+
+    <div class="block" x-show="detail">
+      <h3>Log
+        <span class="card-meta" style="font-weight:400" x-text="'(' + (detail?.interactions?.length || 0) + ')'"></span>
+      </h3>
+      <template x-if="(detail?.interactions || []).length === 0">
+        <div class="empty" style="padding: 4px 0">No entries on this card yet.</div>
+      </template>
+      <div class="entries">
+        <template x-for="i in detail.interactions" :key="i.id">
+          <div class="entry">
+            <div class="entry-head">
+              <span class="tag channel" x-text="i.channel"></span>
+              <span class="date" x-text="i.occurred_at.slice(0,16).replace('T', ' ')"></span>
+            </div>
+            <div class="entry-summary" x-text="i.summary"></div>
+            <div x-show="i.follow_up_date" class="entry-followup" :class="{done: i.completed_at}">
+              <template x-if="i.completed_at">
+                <span>Followed up on <span x-text="i.follow_up_date"></span></span>
+              </template>
+              <template x-if="!i.completed_at">
+                <span>Next: <span x-text="i.follow_up_date"></span></span>
+              </template>
+            </div>
+            <div x-show="i.completed_at && !i.follow_up_date" class="entry-completed">
+              ✓ Closed <span x-text="(i.completed_at || '').slice(0,10)"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INTAKE -->
+<section x-show="tab==='intake'" x-cloak>
+  <div class="section-rule"><span>Export</span></div>
+  <div class="block">
+    <p class="help">
+      Download the entire book as a two-sheet Excel file (Contacts + Interactions).
+      Round-trip safe — you can edit the contacts sheet and re-import the same file
+      without losing anything; rows already on file are skipped.
+    </p>
+    <button class="btn" @click="exportData()">⤓ Download flipbook.xlsx</button>
+  </div>
+
+  <div class="section-rule"><span>Intake from Excel</span></div>
+  <div class="block">
+    <p class="help">
+      Drop in an .xlsx. The intake recognises Norwegian and English headers.
+      Re-importing the same file is safe; rows already on file are skipped.
+    </p>
+    <table class="help">
+      <tr><td>Name</td><td>Name, Navn, Kontaktperson, Contact</td></tr>
+      <tr><td>Firm</td><td>Company, Firma, Bedrift, Selskap, Kunde</td></tr>
+      <tr><td>Role</td><td>Role, Title, Rolle, Stilling</td></tr>
+      <tr><td>Phone</td><td>Phone, Telefon, Tlf, Mobil</td></tr>
+      <tr><td>Email</td><td>Email, E-post, Epost</td></tr>
+      <tr><td>Notes</td><td>Notes, Notater, Kommentar</td></tr>
+      <tr><td>Tags</td><td>Tags, Etiketter</td></tr>
+    </table>
+    <div class="dropzone"
+         :class="{dragging: dragging}"
+         @click="$refs.fileInput.click()"
+         @dragover.prevent="dragging = true"
+         @dragleave.prevent="dragging = false"
+         @drop.prevent="dragging = false; handleDrop($event)">
+      <div class="dropzone-icon">⤓</div>
+      <div class="dropzone-title">Drop a .xlsx file here</div>
+      <div class="dropzone-hint">or click to choose</div>
+    </div>
+    <input type="file" accept=".xlsx,.xlsm" @change="importFile($event)" x-ref="fileInput" style="display:none">
+
+    <template x-if="importResult">
+      <div style="margin-top: 16px">
+        <div class="section-rule" style="margin-top: 0"><span>Result</span></div>
+        <div style="font-size: 14px">
+          <strong x-text="importResult.created"></strong> created,
+          <strong x-text="importResult.skipped"></strong> already on file,
+          <span x-text="importResult.total_rows"></span> rows seen.
+        </div>
+        <details x-show="importResult.column_map" style="margin-top: 10px">
+          <summary>Column mapping</summary>
+          <pre x-text="JSON.stringify(importResult.column_map, null, 2)"></pre>
+        </details>
+        <template x-if="importResult.errors && importResult.errors.length">
+          <details style="margin-top: 8px">
+            <summary x-text="importResult.errors.length + ' warnings'"></summary>
+            <ul style="font-size: 13px"><template x-for="e in importResult.errors" :key="e"><li x-text="e"></li></template></ul>
+          </details>
+        </template>
+      </div>
+    </template>
+  </div>
+</section>
+
+</main>
+
+<footer class="colophon">
+  A poka-yoke production by Gervi Labs <span class="dot">·</span> 2026
+</footer>
+
+<script>
+function flipbook() {
+  return {
+    tab: 'bench',
+    status: 'connecting',
+    error: '',
+    tags: [],
+    bench: { followups: [], upcoming: [], recent: [] },
+    contacts: [],
+    q: '',
+    tagFilter: '',
+    detail: null,
+    newOpen: false,
+    newContact: { name: '', company: '', role: '', phone: '', email: '', tags: '', notes: '' },
+    newEntry: { channel: 'call', summary: '', follow_up_date: '' },
+    importResult: null,
+    dragging: false,
+
+    async init() {
+      try {
+        const r = await fetch('/health');
+        this.status = r.ok ? 'connected' : 'offline';
+      } catch {
+        this.status = 'offline';
+      }
+      try {
+        await this.loadTags();
+        await this.loadBench();
+      } catch {}
+    },
+
+    async api(path, opts = {}) {
+      let r;
+      try {
+        r = await fetch('/api' + path, opts);
+      } catch (e) {
+        this.error = 'Network error: ' + (e.message || e);
+        throw e;
+      }
+      if (!r.ok) {
+        let msg;
+        try {
+          const data = await r.json();
+          msg = data.detail || JSON.stringify(data);
+        } catch {
+          msg = `${r.status} ${r.statusText}`;
+        }
+        this.error = msg;
+        throw new Error(msg);
+      }
+      this.error = '';
+      if (r.status === 204) return null;
+      return r.json();
+    },
+
+    async loadTags() { this.tags = await this.api('/tags'); },
+
+    async loadBench() {
+      const data = await this.api('/today');
+      this.bench = {
+        followups: data.followups || [],
+        upcoming: data.upcoming || [],
+        recent: data.recent || [],
+      };
+    },
+
+    async exportData() {
+      try {
+        const r = await fetch('/api/export/excel');
+        if (!r.ok) {
+          this.error = `Export failed (HTTP ${r.status})`;
+          return;
+        }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `flipbook-${new Date().toISOString().slice(0,10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        this.error = '';
+      } catch (e) {
+        this.error = 'Export failed: ' + (e.message || e);
+      }
+    },
+
+    async loadBook() {
+      const params = new URLSearchParams();
+      if (this.q)         params.set('q', this.q);
+      if (this.tagFilter) params.set('tag', this.tagFilter);
+      this.contacts = await this.api('/contacts?' + params.toString());
+    },
+
+    async openContact(id) {
+      this.detail = await this.api('/contacts/' + id);
+      this.newEntry = { channel: 'call', summary: '', follow_up_date: '' };
+    },
+
+    async saveContact() {
+      const { id, interactions, created_at, updated_at, ...patch } = this.detail;
+      const updated = await this.api('/contacts/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      this.detail = { ...updated, interactions };
+      await this.loadTags();
+    },
+
+    async deleteContact() {
+      if (!confirm('Delete this card and all its entries?')) return;
+      await this.api('/contacts/' + this.detail.id, { method: 'DELETE' });
+      this.detail = null;
+      await this.loadBook();
+      await this.loadTags();
+    },
+
+    async createContact() {
+      const created = await this.api('/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.newContact),
+      });
+      this.newContact = { name: '', company: '', role: '', phone: '', email: '', tags: '', notes: '' };
+      this.newOpen = false;
+      await this.openContact(created.id);
+      await this.loadTags();
+    },
+
+    async logEntry() {
+      await this.api('/interactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contact_id: this.detail.id, ...this.newEntry }),
+      });
+      await this.openContact(this.detail.id);
+      await this.loadBench();
+    },
+
+    async completeFollowup(interactionId) {
+      await this.api('/interactions/' + interactionId + '/complete', { method: 'POST' });
+      await this.loadBench();
+      if (this.detail) await this.openContact(this.detail.id);
+    },
+
+    handleDrop(e) {
+      const f = e.dataTransfer?.files?.[0];
+      if (!f) return;
+      this.uploadFile(f);
+    },
+
+    async importFile(e) {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        await this.uploadFile(f);
+      } finally {
+        e.target.value = '';
+      }
+    },
+
+    async uploadFile(f) {
+      const allowed = /\.(xlsx|xlsm)$/i;
+      if (!allowed.test(f.name)) {
+        this.error = `Only .xlsx/.xlsm files are supported (got "${f.name}")`;
+        this.importResult = null;
+        return;
+      }
+      const fd = new FormData();
+      fd.append('file', f);
+      let r;
+      try {
+        r = await fetch('/api/import/excel', { method: 'POST', body: fd });
+      } catch (e) {
+        this.error = 'Network error: ' + (e.message || e);
+        return;
+      }
+      let data;
+      try { data = await r.json(); } catch { data = null; }
+      if (!r.ok) {
+        this.error = (data && data.detail) || `${r.status} ${r.statusText}`;
+        this.importResult = null;
+        return;
+      }
+      this.error = '';
+      this.importResult = data;
+      await this.loadTags();
+      await this.loadBook();
+      await this.loadBench();
+    },
+  };
+}
+</script>
+</body>
+</html>
+<!-- A poka-yoke production by Gervi Labs · 2026 -->
+
